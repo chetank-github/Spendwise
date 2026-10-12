@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Expense, User
+from app.models import AuditLog, Expense, User
 from app.models.enums import ExpenseCategory, ExpenseStatus
-from app.schemas.expense import ExpenseCreate, ExpenseList, ExpenseOut, ExpenseUpdate
+from app.schemas.expense import (ActionComment, AuditLogOut, ExpenseCreate, ExpenseList, ExpenseOut,
+                                 ExpenseUpdate, RejectRequest)
+from app.services import workflow
 from app.services.expense_access import (get_own_editable_expense, get_visible_expense,
                                          visible_expenses_query)
 
@@ -23,7 +25,8 @@ ALLOWED_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "application/pdf": "
 
 
 def to_out(e: Expense) -> ExpenseOut:
-    return ExpenseOut.model_validate({**e.__dict__, "has_receipt": e.receipt_path is not None})
+    return ExpenseOut.model_validate({**e.__dict__, "has_receipt": e.receipt_path is not None,
+                                      "policy_flags": e.policy_flags or []})
 
 
 @router.post("", response_model=ExpenseOut, status_code=status.HTTP_201_CREATED)
@@ -134,3 +137,39 @@ def download_receipt(expense_id: int, db: Session = Depends(get_db), user: User 
     if not expense.receipt_path or not Path(expense.receipt_path).exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No receipt uploaded")
     return FileResponse(expense.receipt_path)
+
+
+# ---------------- Approval workflow ----------------
+
+@router.post("/{expense_id}/submit", response_model=ExpenseOut)
+def submit_expense(expense_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    expense = get_visible_expense(db, user, expense_id)
+    return to_out(workflow.submit(db, expense, user))
+
+
+@router.post("/{expense_id}/approve", response_model=ExpenseOut)
+def approve_expense(expense_id: int, body: ActionComment | None = None, db: Session = Depends(get_db),
+                    user: User = Depends(get_current_user)):
+    expense = get_visible_expense(db, user, expense_id)
+    return to_out(workflow.approve(db, expense, user, body.comment if body else None))
+
+
+@router.post("/{expense_id}/reject", response_model=ExpenseOut)
+def reject_expense(expense_id: int, body: RejectRequest, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    expense = get_visible_expense(db, user, expense_id)
+    return to_out(workflow.reject(db, expense, user, body.comment))
+
+
+@router.post("/{expense_id}/reimburse", response_model=ExpenseOut)
+def reimburse_expense(expense_id: int, body: ActionComment | None = None, db: Session = Depends(get_db),
+                      user: User = Depends(get_current_user)):
+    expense = get_visible_expense(db, user, expense_id)
+    return to_out(workflow.reimburse(db, expense, user, body.comment if body else None))
+
+
+@router.get("/{expense_id}/history", response_model=list[AuditLogOut])
+def expense_history(expense_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    expense = get_visible_expense(db, user, expense_id)
+    return db.scalars(select(AuditLog).where(AuditLog.expense_id == expense.id)
+                      .order_by(AuditLog.created_at, AuditLog.id)).all()

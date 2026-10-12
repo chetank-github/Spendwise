@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.db.session import get_db
-from app.models import Team, User
+from app.models import Budget, Team, User
 from app.models.enums import UserRole
+from app.schemas.report import BudgetIn, BudgetOut
 from app.schemas.user import TeamCreate, TeamOut, UserOut, UserUpdate
 
 # Every route in this file is restricted to the finance (admin) role.
@@ -46,3 +47,28 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.put("/budgets", response_model=BudgetOut)
+def set_budget(data: BudgetIn, db: Session = Depends(get_db)):
+    """Create or update the budget for one team + category."""
+    if db.get(Team, data.team_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+    budget = db.scalar(select(Budget).where(Budget.team_id == data.team_id, Budget.category == data.category))
+    if budget is None:
+        budget = Budget(**data.model_dump())
+        db.add(budget)
+    else:
+        budget.monthly_limit = data.monthly_limit
+        budget.per_claim_limit = data.per_claim_limit
+    db.commit()
+    db.refresh(budget)
+    return budget
+
+
+@router.get("/budgets", response_model=list[BudgetOut])
+def list_budgets(team_id: int | None = None, db: Session = Depends(get_db)):
+    query = select(Budget).order_by(Budget.team_id, Budget.category)
+    if team_id:
+        query = query.where(Budget.team_id == team_id)
+    return db.scalars(query).all()

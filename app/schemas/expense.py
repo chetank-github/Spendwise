@@ -54,6 +54,7 @@ class ExpenseOut(ExpenseBase):
     owner_id: int
     status: ExpenseStatus
     has_receipt: bool
+    policy_flags: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -69,3 +70,23 @@ class ExpenseList(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class ActionComment(BaseModel):
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class RejectRequest(BaseModel):
+    comment: str = Field(min_length=3, max_length=1000, description="Reason for rejection")
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    actor_id: int
+    action: str
+    from_status: str | None
+    to_status: str | None
+    comment: str | None
+    created_at: datetime
