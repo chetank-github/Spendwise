@@ -55,6 +55,10 @@ class ExpenseOut(ExpenseBase):
     status: ExpenseStatus
     has_receipt: bool
     policy_flags: list[str] = []
+    gstin: str | None = None
+    tax_amount: Decimal | None = None
+    ai_extracted: bool = False
+    ai_confidence: float | None = None
     created_at: datetime
     updated_at: datetime
 

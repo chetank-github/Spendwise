@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import AuditLog, Budget, Expense, User
 from app.models.enums import ExpenseStatus, UserRole
 
@@ -78,7 +79,10 @@ def submit(db: Session, expense: Expense, actor: User) -> Expense:
     if expense.amount > RECEIPT_REQUIRED_ABOVE and not expense.receipt_path:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"A receipt is required for expenses above {RECEIPT_REQUIRED_ABOVE}")
-    expense.policy_flags = check_policies(db, expense, actor) or None
+    flags = check_policies(db, expense, actor)
+    if expense.ai_extracted and (expense.ai_confidence or 0) < settings.ai_min_confidence:
+        flags.append("Filled in by AI with low confidence: verify against the receipt")
+    expense.policy_flags = flags or None
     return _transition(db, expense, actor, "submit")
 
 

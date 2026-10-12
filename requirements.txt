@@ -8,3 +8,4 @@ pwdlib[argon2]
 google-genai
 pillow
 pytest
+openai

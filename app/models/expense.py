@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, Float, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -22,6 +22,11 @@ class Expense(Base):
     description: Mapped[str | None] = mapped_column(Text)
     receipt_path: Mapped[str | None] = mapped_column(String(500))
     policy_flags: Mapped[list[str] | None] = mapped_column(JSON)
+    gstin: Mapped[str | None] = mapped_column(String(15))
+    tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    ai_extracted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    ai_confidence: Mapped[float | None] = mapped_column(Float)
+    ai_raw: Mapped[dict | None] = mapped_column(JSON)
     status: Mapped[ExpenseStatus] = mapped_column(
         Enum(ExpenseStatus, native_enum=False, length=20), default=ExpenseStatus.draft, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
