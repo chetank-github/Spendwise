@@ -21,6 +21,7 @@ class Expense(Base):
     expense_date: Mapped[date] = mapped_column(Date)
     description: Mapped[str | None] = mapped_column(Text)
     receipt_path: Mapped[str | None] = mapped_column(String(500))
+    receipt_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     policy_flags: Mapped[list[str] | None] = mapped_column(JSON)
     gstin: Mapped[str | None] = mapped_column(String(15))
     tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))

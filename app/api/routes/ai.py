@@ -10,10 +10,13 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models import Expense, User
 from app.models.enums import ExpenseStatus
+from pydantic import BaseModel, Field
+
 from app.schemas.expense import ExpenseOut
-from app.services.ai import receipt_reader
+from app.services import fraud_checks, workflow
+from app.services.ai import categorizer, receipt_reader
 from app.services.ai.receipt_reader import ReceiptAIError
-from app.services.expense_access import get_own_editable_expense
+from app.services.expense_access import get_own_editable_expense, get_visible_expense
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -92,3 +95,51 @@ async def extract_for_expense(expense_id: int, overwrite: bool = False, db: Sess
     db.commit()
     db.refresh(expense)
     return to_out(expense)
+
+
+class CategorizeRequest(BaseModel):
+    vendor: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class CategorizeResponse(BaseModel):
+    category: str
+    source: str  # rules | ai | default
+
+
+class RiskCheckResponse(BaseModel):
+    expense_id: int
+    flags: list[str]
+
+
+@router.post("/categorize", response_model=CategorizeResponse)
+async def suggest_category(body: CategorizeRequest, user: User = Depends(get_current_user)):
+    """Suggest a category from vendor/description (keyword rules first, AI as fallback)."""
+    category, source = await categorizer.categorize(body.vendor, body.description)
+    return CategorizeResponse(category=category.value, source=source)
+
+
+@router.post("/expenses/{expense_id}/categorize", response_model=ExpenseOut)
+async def categorize_expense(expense_id: int, db: Session = Depends(get_db),
+                             user: User = Depends(get_current_user)):
+    """Auto-set the category of one of your draft/rejected expenses."""
+    expense = get_own_editable_expense(db, user, expense_id)
+    category, _ = await categorizer.categorize(expense.vendor, expense.description)
+    expense.category = category
+    db.commit()
+    db.refresh(expense)
+    return to_out(expense)
+
+
+@router.get("/expenses/{expense_id}/risk-check", response_model=RiskCheckResponse)
+def risk_check(expense_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Preview budget, duplicate and unusual-amount flags without submitting."""
+    expense = get_visible_expense(db, user, expense_id)
+    owner = db.get(User, expense.owner_id)
+    with db.no_autoflush:
+        expense.receipt_hash = fraud_checks.file_hash(expense.receipt_path)
+        flags = (workflow.check_policies(db, expense, owner)
+                 + fraud_checks.duplicate_flags(db, expense)
+                 + fraud_checks.unusual_amount_flags(db, expense, owner))
+    db.rollback()  # preview only: don't save anything
+    return RiskCheckResponse(expense_id=expense_id, flags=flags)
