@@ -1,0 +1,13 @@
+file,vendor,expense_date,total_amount,tax_amount,gstin
+r01_restaurant.png,Spice Route Kitchen,2026-10-03,1344.00,64.00,27ABCDE1234F1Z5
+r02_cafe.png,Brew Lane Cafe,2026-09-14,609.00,29.00,27BREWL4521K1Z2
+r03_cab.png,CityRide Cabs,2026-09-22,561.75,26.75,29CITYR9087C1Z9
+r04_hotel.png,Hotel Sahyadri Residency,2026-08-29,7056.00,756.00,27HOTEL7781D1ZQ
+r05_software.png,CloudNest Software Pvt Ltd,2026-10-01,2948.82,449.82,29CLDNS3344P1Z1
+r06_stationery.png,Om Stationers,2026-09-05,1205.00,,
+r07_fuel.png,Highway Fuels,2026-09-18,2344.50,,27HWYFL5566R1Z3
+r08_flight.png,SkyJet Airlines,2026-09-10,5953.50,283.50,07SKYJT1122A1ZK
+r09_lunch.png,Annapurna Thali House,2026-10-07,1260.00,60.00,27ANNPR6655T1Z8
+r10_training.png,SkillForge Academy,2026-08-20,5310.00,810.00,29SKFRG8899L1Z4
+r11_snacks.png,Chai Corner,2026-10-09,330.00,,
+r12_client.png,The Grand Terrace,2026-09-26,7980.00,380.00,27GRNDT2233H1Z6

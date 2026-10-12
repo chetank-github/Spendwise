@@ -6,6 +6,6 @@ pydantic-settings
 pyjwt
 pwdlib[argon2]
 google-genai
+openai
 pillow
 pytest
-openai
